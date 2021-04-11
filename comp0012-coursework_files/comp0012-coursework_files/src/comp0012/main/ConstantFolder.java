@@ -38,6 +38,12 @@ public class ConstantFolder
 		}
 	}
 	
+	public void optimizeMethod( ClassGen cgen, ConstantPoolGen cpgen, Method method){
+		
+	
+	}
+	
+	
 	public void optimize()
 	{
 		ClassGen cgen = new ClassGen(original);
@@ -52,6 +58,8 @@ public class ConstantFolder
         
 		this.optimized = gen.getJavaClass();
 	}
+	
+
 
 	
 	public void write(String optimisedFilePath)
