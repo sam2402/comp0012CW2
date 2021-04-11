@@ -38,6 +38,12 @@ public class ConstantFolder
 		}
 	}
 	
+
+	public void optimizeMethod( ClassGen cgen, ConstantPoolGen cpgen, Method method){
+		
+	
+	}
+
 	public void optimize()
 	{
 		ClassGen cgen = new ClassGen(original);
@@ -69,4 +75,6 @@ public class ConstantFolder
 			e.printStackTrace();
 		}
 	}
+
 }
+
