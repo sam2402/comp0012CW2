@@ -1,0 +1,14 @@
+<component name="libraryTable">
+  <library name="lib">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/comp0012-coursework_files/comp0012-coursework_files/lib/bcel-5.2.jar!/" />
+      <root url="jar://$PROJECT_DIR$/comp0012-coursework_files/comp0012-coursework_files/lib/junit-4.12.jar!/" />
+      <root url="jar://$PROJECT_DIR$/comp0012-coursework_files/comp0012-coursework_files/lib/bcel-6.0-SNAPSHOT.jar!/" />
+      <root url="jar://$PROJECT_DIR$/comp0012-coursework_files/comp0012-coursework_files/lib/hamcrest-core-1.3.jar!/" />
+      <root url="jar://$PROJECT_DIR$/comp0012-coursework_files/comp0012-coursework_files/lib/args4j-2.0.21.jar!/" />
+      <root url="jar://$PROJECT_DIR$/comp0012-coursework_files/comp0012-coursework_files/lib/jasmin.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>
