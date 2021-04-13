@@ -34,9 +34,26 @@ public class ConstantFolder
 			e.printStackTrace();
 		}
 	}
+	//deletes while removing any goto reference to it
+	private void deleteInstruction(InstructionHandle handle, InstructionList instructionList)
+	{
+		try {
+			instructionList.delete(handle);
+		} catch (TargetLostException e) {
+			InstructionHandle[] targets = e.getTargets();
+
+			for (InstructionHandle target : targets) {
+				InstructionTargeter[] targeters = target.getTargeters();
+				for (InstructionTargeter targeter : targeters)
+					targeter.updateTarget(target, null);
+			}
+		}
+	}
+
 
 	private ArrayList<Integer> getLoopPositions(InstructionList instructionList){
 		ArrayList<Integer> loopPositions = new ArrayList<>();
+
 
 		for (InstructionHandle handle : instructionList.getInstructionHandles()) {
 			Instruction inst = handle.getInstruction();
@@ -59,7 +76,7 @@ public class ConstantFolder
 		return loopPositions;
 	}
 
-	//replaces a variable load by loading a constant
+	//replaces a variable load by loading a constant ill try replacing it with something more efficient
 	public void replaceVarLoad(ConstantPoolGen cpgen,InstructionList instructionList, InstructionHandle handle,Number stackTop){
 		if (stackTop instanceof Integer){
 			handle.setInstruction(new LDC(cpgen.addInteger((Integer) stackTop)));
@@ -74,6 +91,46 @@ public class ConstantFolder
 			instructionList.insert(handle, new LDC2_W(cpgen.addDouble((Double) stackTop)));
 		}
 	}
+
+	public void removeLDCs(InstructionHandle handle, InstructionList instructionList, int numberToDelete){
+		int deleted = 0;
+		InstructionHandle handleToCheck = handle.getPrev();
+		while (deleted != numberToDelete) {
+
+			if ((handleToCheck.getInstruction() instanceof LDC) || (handleToCheck.getInstruction() instanceof LDC2_W)) {
+				deleted++;
+				if (deleted < numberToDelete) {
+					handleToCheck = handleToCheck.getPrev();
+					deleteInstruction(handleToCheck.getNext(), instructionList);
+					continue;
+				} else {
+					deleteInstruction(handleToCheck, instructionList);
+				}
+
+			}
+			else if (handleToCheck.getPrev() == null) {
+				break;
+			}
+			handleToCheck = handleToCheck.getPrev();
+		}
+	}
+	public Number getConstantValue(ConstantPoolGen cpgen, InstructionHandle handle ){
+		Instruction instruction = handle.getInstruction();
+		if ((instruction instanceof LDC)) {
+			return (Number) (((LDC) handle.getInstruction()).getValue(cpgen));
+		}
+		else if (instruction instanceof LDC2_W) {
+			return (((LDC2_W) handle.getInstruction()).getValue(cpgen));
+		}
+		else if (instruction instanceof BIPUSH) {
+			return (((BIPUSH) handle.getInstruction()).getValue());
+		}
+		else if (instruction instanceof SIPUSH) {
+			return (((SIPUSH) handle.getInstruction()).getValue());
+		}
+		return null;
+	}
+
 
 
 	public void optimizeMethod( ClassGen cgen, ConstantPoolGen cpgen, Method method){
@@ -93,62 +150,149 @@ public class ConstantFolder
 
 		// search for loops to know if you should apply folding to the variable or not
 		ArrayList<Integer> loopArray = getLoopPositions(instructionList); //positions of loops
-		for (InstructionHandle handle : instructionList.getInstructionHandles()){
+		for (InstructionHandle handle : instructionList.getInstructionHandles()) {
 
-			if (handle.getInstruction() == null ){
+			if (handle.getInstruction() == null) {
 				continue;//if the instruction is null go to next
 			}
 
 			boolean inLoop = false;
-			for (int i = 0; i < loopArray.size(); i+=3 ){//each loop is represented by 3 values, start, end and the index of the incremented value
+			for (int i = 0; i < loopArray.size(); i += 3) {//each loop is represented by 3 values, start, end and the index of the incremented value
 				Integer start = loopArray.get(i);
-				Integer end   = loopArray.get(i+1);
-				if (handle.getPosition() <= end && handle.getPosition() >= start){
+				Integer end = loopArray.get(i + 1);
+				if (handle.getPosition() <= end && handle.getPosition() >= start) {
 					inLoop = true;
 				}
 			}
 
-			boolean isLDC = (handle.getInstruction() instanceof LDC) || (handle.getInstruction() instanceof LDC_W) || (handle.getInstruction() instanceof LDC2_W);
+			boolean isLDCorPush = (handle.getInstruction() instanceof LDC) || (handle.getInstruction() instanceof LDC_W) || (handle.getInstruction() instanceof LDC2_W) || (handle.getInstruction() instanceof SIPUSH) || (handle.getInstruction() instanceof BIPUSH);;
 			boolean isArithmeticInst = (handle.getInstruction() instanceof ArithmeticInstruction);
-			boolean isPush = (handle.getInstruction() instanceof SIPUSH) || (handle.getInstruction() instanceof BIPUSH);
 			boolean isConst = (handle.getInstruction() instanceof ICONST || handle.getInstruction() instanceof FCONST || handle.getInstruction() instanceof LCONST || handle.getInstruction() instanceof DCONST);
 			boolean isStore = (handle.getInstruction() instanceof StoreInstruction);
 			boolean isLoadInst = (handle.getInstruction() instanceof LoadInstruction);
-			boolean isComparison = (handle.getInstruction() instanceof IfInstruction);
 			boolean isLongComparison = (handle.getInstruction() instanceof LCMP);
-			boolean isGoto = (handle.getInstruction() instanceof GotoInstruction);
-			boolean isConversion = (handle.getInstruction() instanceof I2D);
 
 			//check if the instruction are in the loop
-			if (inLoop == true){
-				if (isLoadInst == true){
+			if (inLoop) {
+				if (isLoadInst) {
 					boolean removeNextLoad = true;
-					for (int i = 0; i < loopArray.size(); i += 3){
-						int loopVarIndex = loopArray.get(i+2);
+					for (int i = 0; i < loopArray.size(); i += 3) {
+						int loopVarIndex = loopArray.get(i + 2);
 						int currentIndex = ((LoadInstruction) handle.getInstruction()).getIndex();
 						//here we check if the variable that is loaded is not the variable incremented by the loop
-						if (loopVarIndex == currentIndex){
+						if (loopVarIndex == currentIndex) {
 							removeNextLoad = false;
 							skipNextArithmeticOperation = true; //we do not want to optimize any arithmetic operation where the loop variable is present
 						}
 					}
-					if (removeNextLoad == true){
-						if(!(handle.getInstruction() instanceof ALOAD)){
+					if (removeNextLoad) {
+						if (!(handle.getInstruction() instanceof ALOAD)) {
 							int index = ((LoadInstruction) handle.getInstruction()).getIndex();
 							Number stackTop = variables.get(index);
 							constantStack.push(stackTop);
-							replaceVarLoad(cpgen, instructionList, handle, stackTop);
+							instructionList.insert(handle, new PUSH(cpgen, stackTop));
 						}
 					}
 				}
+				if (isArithmeticInst && (!skipNextArithmeticOperation)) {
+					if (constants >= 2) {
+						removeLDCs(handle, instructionList, 1);
+					}
+					//todo performartihmeticop
+					Number stackTop = constantStack.pop();
+					constants++;
+					instructionList.insert(handle, new PUSH(cpgen, stackTop));
+					constantStack.push(stackTop);
+					deleteInstruction(handle, instructionList);
+				}
+				if (isArithmeticInst && skipNextArithmeticOperation) {
+					skipNextArithmeticOperation = false;
+				}
+			}
+
+
+			if ( isLDCorPush){
+				Number constantValue = getConstantValue(cpgen, handle);
+				constantStack.push(constantValue);
+				deleteInstruction(handle,instructionList);
+			}
+			else if (isLongComparison){
+				Number val1 = constantStack.pop();
+				Number val2 = constantStack.pop();
+				Number toPush = null;
+				if ((Long) val1 > (Long)val2){
+					toPush = 1
+				}
+				else if ((Long) val1 < (Long)val2){
+					toPush = -1;
+				}
+				else{
+					toPush = 0;
+				}
+				constantStack.push(toPush);
+				deleteInstruction(handle,instructionList);
+			}
+			else if (isConst){
+				Number val = null;
+				if (handle.getInstruction() instanceof ICONST) {
+					val = (((ICONST) handle.getInstruction()).getValue());
+				}
+				else if (handle.getInstruction() instanceof FCONST) {
+					val = (((FCONST) handle.getInstruction()).getValue());
+				}
+				else if (handle.getInstruction() instanceof LCONST) {
+					val = (((LCONST) handle.getInstruction()).getValue());
+				}
+				else if (handle.getInstruction() instanceof DCONST) {
+					val = (((DCONST) handle.getInstruction()).getValue());
+				}
+				constantStack.push(val);
 
 			}
-			if (isArithmeticInst && (!skipNextArithmeticOperation)){
-				
+			else if (isArithmeticInst){
+				if (constants >= 2){
+					removeLDCs(handle,instructionList,2);
+				}
+				else{
+					removeLDCs(handle,instructionList,1);
+				}
+				performArithOp(handle);
+				Number stackTop = constantStack.pop();
+				instructionList.insert(handle, new PUSH(cpgen, stackTop));
+				constantStack.push(stackTop);
+				deleteInstruction(handle,instructionList);
 			}
-
-
+			else if (isStore){
+				Number val = constantStack.pop();
+				int index = ((StoreInstruction) handle.getInstruction()).getIndex();
+				variables.put(index,val);
+				deleteInstruction(handle,instructionList);
+			}
+			else if (isLoadInst){
+				if (!(handle.getInstruction() instanceof ALOAD)){
+					int index = ((LoadInstruction) handle.getInstruction()).getIndex();
+					Number stackTop = variables.get(index);
+					constants++;
+					constantStack.push(stackTop);
+					instructionList.insert(handle, new PUSH(cpgen, stackTop));
+					deleteInstruction(handle,instructionList);
+				}
+			}
 		}
+		try{
+			instructionList.setPositions(true);
+		}
+		catch (Exception e){
+			System.out.println("problem setting positions for instructions");
+		}
+		for (InstructionHandle handle : instructionList.getInstructionHandles()){
+			System.out.println(handle.toString());
+		}
+		methodGen.setMaxStack();
+		methodGen.setMaxLocals();
+		Method newMethod = methodGen.getMethod();
+		//replace old method with the new one
+		cgen.replaceMethod(method,newMethod);
 
 
 	}
@@ -156,10 +300,12 @@ public class ConstantFolder
 	public void optimize()
 	{
 		ClassGen cgen = new ClassGen(original);
+		cgen.setMajor(50);
 		ConstantPoolGen cpgen = cgen.getConstantPool();
 
 		// Implement your optimization here
 		Method[] methods = cgen.getMethods();
+
 		for (Method m : methods) {
 			optimizeMethod(cgen, cpgen, m);
 		}
