@@ -50,8 +50,10 @@ public class ConstantFolder
 		}
 	}
 
-	public ArrayList<Integer> getLoopPositions(InstructionList instructionList){
-		ArrayList<Integer> loopPositions = new ArrayList<Integer>();
+
+	private ArrayList<Integer> getLoopPositions(InstructionList instructionList){
+		ArrayList<Integer> loopPositions = new ArrayList<>();
+
 
 		for (InstructionHandle handle : instructionList.getInstructionHandles()) {
 			Instruction inst = handle.getInstruction();
@@ -292,6 +294,7 @@ public class ConstantFolder
 		//replace old method with the new one
 		cgen.replaceMethod(method,newMethod);
 
+
 	}
 
 	public void optimize()
@@ -302,9 +305,9 @@ public class ConstantFolder
 
 		// Implement your optimization here
 		Method[] methods = cgen.getMethods();
-		for (Method m : methods){
-			//todo call optimizeMethod
-			optimizeMethod(cgen,cpgen,m);
+
+		for (Method m : methods) {
+			optimizeMethod(cgen, cpgen, m);
 		}
         
 		this.optimized = gen.getJavaClass();
