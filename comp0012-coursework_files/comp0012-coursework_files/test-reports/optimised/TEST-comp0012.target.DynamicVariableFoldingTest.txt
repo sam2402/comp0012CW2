@@ -1,0 +1,20 @@
+Testsuite: comp0012.target.DynamicVariableFoldingTest
+Tests run: 1, Failures: 0, Errors: 1, Skipped: 0, Time elapsed: 0.013 sec
+
+Testcase: initializationError took 0.002 sec
+	Caused an ERROR
+comp0012/target/DynamicVariableFolding
+java.lang.NoClassDefFoundError: comp0012/target/DynamicVariableFolding
+	at java.base/java.lang.Class.getDeclaredFields0(Native Method)
+	at java.base/java.lang.Class.privateGetDeclaredFields(Class.java:3220)
+	at java.base/java.lang.Class.getDeclaredFields(Class.java:2341)
+	at java.base/jdk.internal.reflect.NativeConstructorAccessorImpl.newInstance0(Native Method)
+	at java.base/jdk.internal.reflect.NativeConstructorAccessorImpl.newInstance(NativeConstructorAccessorImpl.java:64)
+	at java.base/jdk.internal.reflect.DelegatingConstructorAccessorImpl.newInstance(DelegatingConstructorAccessorImpl.java:45)
+	at java.base/java.lang.reflect.Constructor.newInstanceWithCaller(Constructor.java:500)
+	at java.base/java.lang.reflect.Constructor.newInstance(Constructor.java:481)
+Caused by: java.lang.ClassNotFoundException: comp0012.target.DynamicVariableFolding
+	at java.base/jdk.internal.loader.BuiltinClassLoader.loadClass(BuiltinClassLoader.java:606)
+	at java.base/jdk.internal.loader.ClassLoaders$AppClassLoader.loadClass(ClassLoaders.java:168)
+	at java.base/java.lang.ClassLoader.loadClass(ClassLoader.java:522)
+

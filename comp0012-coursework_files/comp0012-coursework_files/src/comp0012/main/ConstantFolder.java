@@ -24,6 +24,9 @@ public class ConstantFolder
 	JavaClass original = null;
 	JavaClass optimized = null;
 
+	Stack<Number> constantStack = null;
+	HashMap<Integer, Number> variables = null;
+
 	public ConstantFolder(String classFilePath)
 	{
 		try{
@@ -76,21 +79,6 @@ public class ConstantFolder
 		return loopPositions;
 	}
 
-	//replaces a variable load by loading a constant ill try replacing it with something more efficient
-	public void replaceVarLoad(ConstantPoolGen cpgen,InstructionList instructionList, InstructionHandle handle,Number stackTop){
-		if (stackTop instanceof Integer){
-			handle.setInstruction(new LDC(cpgen.addInteger((Integer) stackTop)));
-		}
-		else if (stackTop instanceof Float){
-			instructionList.insert(handle, new LDC(cpgen.addFloat((Float) stackTop)));
-		}
-		else if (stackTop instanceof Long){
-			instructionList.insert(handle, new LDC2_W(cpgen.addLong((Long) stackTop)));
-		}
-		else if (stackTop instanceof Double){
-			instructionList.insert(handle, new LDC2_W(cpgen.addDouble((Double) stackTop)));
-		}
-	}
 
 	public void removeLDCs(InstructionHandle handle, InstructionList instructionList, int numberToDelete){
 		int deleted = 0;
@@ -132,11 +120,71 @@ public class ConstantFolder
 	}
 
 
+	private void doArithmeticOperation(Instruction operator){
+		Number first = constantStack.pop();
+		Number second = constantStack.pop();
+
+		if (operator instanceof IADD) {
+			Number newValue = second.intValue() + first.intValue();
+			constantStack.push(newValue);
+		} else if (operator instanceof LADD) {
+			Number newValue = second.longValue() + first.longValue();
+			constantStack.push(newValue);
+		} else if (operator instanceof FADD) {
+			Number newValue = second.floatValue() + first.floatValue();
+			constantStack.push(newValue);
+		} else if (operator instanceof DADD) {
+			Number newValue = second.doubleValue() + first.doubleValue();
+			constantStack.push(newValue);
+		}
+		else if (operator instanceof IMUL) {
+			Number newValue = second.intValue() * first.intValue();
+			constantStack.push(newValue);
+		} else if (operator instanceof LMUL) {
+			Number newValue = second.longValue() * first.longValue();
+			constantStack.push(newValue);
+		} else if (operator instanceof FMUL) {
+			Number newValue = second.floatValue() * first.floatValue();
+			constantStack.push(newValue);
+		} else if (operator instanceof DMUL) {
+			Number newValue = second.doubleValue() * first.doubleValue();
+			constantStack.push(newValue);
+		}
+		else if (operator instanceof ISUB) {
+			Number newValue = second.intValue() - first.intValue();
+			constantStack.push(newValue);
+		} else if (operator instanceof LSUB) {
+			Number newValue = second.longValue() - first.longValue();
+			constantStack.push(newValue);
+		} else if (operator instanceof FSUB) {
+			Number newValue = second.floatValue() - first.floatValue();
+			constantStack.push(newValue);
+		} else if (operator instanceof DSUB) {
+			Number newValue = second.doubleValue() - first.doubleValue();
+			constantStack.push(newValue);
+		}
+		else if (operator instanceof IDIV) {
+			Number newValue = second.intValue() / first.intValue();
+			constantStack.push(newValue);
+		} else if (operator instanceof LDIV) {
+			Number newValue = second.longValue() / first.longValue();
+			constantStack.push(newValue);
+		} else if (operator instanceof FDIV) {
+			Number newValue = second.floatValue() / first.floatValue();
+			constantStack.push(newValue);
+		} else if (operator instanceof DDIV) {
+			Number newValue = second.doubleValue() / first.doubleValue();
+			constantStack.push(newValue);
+		}
+
+	}
+
+
 
 	public void optimizeMethod( ClassGen cgen, ConstantPoolGen cpgen, Method method){
 		Code methodCode = method.getCode(); //get the code
-		Stack<Number> constantStack = new Stack<Number>();
-		HashMap<Integer, Number> variables = new HashMap<Integer, Number>();
+		constantStack = new Stack<Number>();
+		variables = new HashMap<Integer, Number>();
 
 		InstructionList instructionList = new InstructionList(methodCode.getCode());
 
@@ -170,7 +218,6 @@ public class ConstantFolder
 			boolean isConst = (handle.getInstruction() instanceof ICONST || handle.getInstruction() instanceof FCONST || handle.getInstruction() instanceof LCONST || handle.getInstruction() instanceof DCONST);
 			boolean isStore = (handle.getInstruction() instanceof StoreInstruction);
 			boolean isLoadInst = (handle.getInstruction() instanceof LoadInstruction);
-			boolean isLongComparison = (handle.getInstruction() instanceof LCMP);
 
 			//check if the instruction are in the loop
 			if (inLoop) {
@@ -190,7 +237,13 @@ public class ConstantFolder
 							int index = ((LoadInstruction) handle.getInstruction()).getIndex();
 							Number stackTop = variables.get(index);
 							constantStack.push(stackTop);
-							instructionList.insert(handle, new PUSH(cpgen, stackTop));
+							if (stackTop instanceof Integer){
+								handle.setInstruction(new LDC(cpgen.addInteger((Integer) stackTop)));
+							}
+							else{
+								instructionList.insert(handle, new PUSH(cpgen, stackTop));
+							}
+
 						}
 					}
 				}
@@ -198,7 +251,7 @@ public class ConstantFolder
 					if (constants >= 2) {
 						removeLDCs(handle, instructionList, 1);
 					}
-					//todo performartihmeticop
+					doArithmeticOperation(handle.getInstruction());
 					Number stackTop = constantStack.pop();
 					constants++;
 					instructionList.insert(handle, new PUSH(cpgen, stackTop));
@@ -216,22 +269,7 @@ public class ConstantFolder
 				constantStack.push(constantValue);
 				deleteInstruction(handle,instructionList);
 			}
-			else if (isLongComparison){
-				Number val1 = constantStack.pop();
-				Number val2 = constantStack.pop();
-				Number toPush = null;
-				if ((Long) val1 > (Long)val2){
-					toPush = 1
-				}
-				else if ((Long) val1 < (Long)val2){
-					toPush = -1;
-				}
-				else{
-					toPush = 0;
-				}
-				constantStack.push(toPush);
-				deleteInstruction(handle,instructionList);
-			}
+
 			else if (isConst){
 				Number val = null;
 				if (handle.getInstruction() instanceof ICONST) {
@@ -256,7 +294,7 @@ public class ConstantFolder
 				else{
 					removeLDCs(handle,instructionList,1);
 				}
-				performArithOp(handle);
+				doArithmeticOperation(handle.getInstruction());
 				Number stackTop = constantStack.pop();
 				instructionList.insert(handle, new PUSH(cpgen, stackTop));
 				constantStack.push(stackTop);
@@ -301,16 +339,16 @@ public class ConstantFolder
 	{
 		ClassGen cgen = new ClassGen(original);
 		cgen.setMajor(50);
+		cgen.setMinor(0);
 		ConstantPoolGen cpgen = cgen.getConstantPool();
 
 		// Implement your optimization here
 		Method[] methods = cgen.getMethods();
-
-		for (Method m : methods) {
-			optimizeMethod(cgen, cpgen, m);
+		for (Method m : methods){
+			optimizeMethod(cgen,cpgen,m);
 		}
         
-		this.optimized = gen.getJavaClass();
+		this.optimized = cgen.getJavaClass();
 	}
 
 	
