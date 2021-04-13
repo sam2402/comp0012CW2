@@ -53,8 +53,10 @@ public class ConstantFolder
 		}
 	}
 
-	public ArrayList<Integer> getLoopPositions(InstructionList instructionList){
-		ArrayList<Integer> loopPositions = new ArrayList<Integer>();
+
+	private ArrayList<Integer> getLoopPositions(InstructionList instructionList){
+		ArrayList<Integer> loopPositions = new ArrayList<>();
+
 
 		for (InstructionHandle handle : instructionList.getInstructionHandles()) {
 			Instruction inst = handle.getInstruction();
@@ -216,7 +218,6 @@ public class ConstantFolder
 			boolean isConst = (handle.getInstruction() instanceof ICONST || handle.getInstruction() instanceof FCONST || handle.getInstruction() instanceof LCONST || handle.getInstruction() instanceof DCONST);
 			boolean isStore = (handle.getInstruction() instanceof StoreInstruction);
 			boolean isLoadInst = (handle.getInstruction() instanceof LoadInstruction);
-			boolean isLongComparison = (handle.getInstruction() instanceof LCMP);
 
 			//check if the instruction are in the loop
 			if (inLoop) {
@@ -330,6 +331,7 @@ public class ConstantFolder
 		Method newMethod = methodGen.getMethod();
 		//replace old method with the new one
 		cgen.replaceMethod(method,newMethod);
+
 
 	}
 
